@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Shuttles V3</title>
+<style>
+:root{
+  --bg:#eee8dc; --ink:#18202a; --muted:#69727c;
+  --red:#ef1714; --blue:#4e79c3; --gold:#ffc01b;
+  --wall:#f7f7f3; --wall-edge:#5ca73f; --track:#252525;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.app{max-width:920px;margin:0 auto;padding:12px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+h1{margin:0;font-size:clamp(26px,6vw,42px);letter-spacing:.06em}
+.sub{font-size:12px;color:var(--muted)}
+button{font:700 14px system-ui;border:0;border-radius:10px;background:white;color:var(--ink);padding:10px 12px;box-shadow:0 2px 7px #0002}
+button:disabled{opacity:.28}
+.status{margin:10px 0;display:flex;justify-content:space-between;gap:8px;align-items:center;background:#ffffffb8;border-radius:11px;padding:9px 12px;font-size:14px}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.shell{background:#1f1f1f;padding:7px;border-radius:14px;box-shadow:0 10px 28px #0003}
+.board{background:#161616;border-radius:8px;overflow:hidden}
+.home-row,.slider-row{display:grid;grid-template-columns:42px minmax(0,1fr) 42px;align-items:center}
+.home-row{padding:5px 0}
+.lane{position:relative;height:62px;background:
+  linear-gradient(to right,
+    transparent 0%,
+    transparent 30.769%,
+    #ffffff09 30.769%,
+    #ffffff09 69.231%,
+    transparent 69.231%,
+    transparent 100%);
+  overflow:visible;
+}
+.lane:before,.lane:after{content:"";position:absolute;top:0;bottom:0;width:1px;background:#ffffff28;z-index:1}
+.lane:before{left:30.769%}.lane:after{left:69.231%}
+.slider-row{border-top:2px solid #111}
+.slider{position:absolute;top:0;height:62px;width:69.23077%;display:grid;grid-template-columns:repeat(9,1fr);transition:left .18s ease;border-radius:2px;box-shadow:0 2px 4px #0005}
+.slider.red{background:var(--red)}
+.slider.blue{background:var(--blue)}
+.slider.gold{background:var(--gold)}
+.cell{position:relative;min-width:0;height:62px;display:flex;align-items:center;justify-content:center}
+.hole{width:34px;height:34px;max-width:72%;aspect-ratio:1;border-radius:50%;background:#050505;box-shadow:inset 0 3px 7px #000}
+.wall{position:absolute;background:var(--wall);border:1.5px solid var(--wall-edge);z-index:4;pointer-events:none}
+.wall.v{top:0;bottom:0;width:11px;transform:translateX(-50%)}
+.wall.h{height:11px}
+.piece{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);width:27px;height:34px;border-radius:12px 12px 8px 8px;z-index:7;box-shadow:0 4px 5px #0007,inset 0 2px 2px #fff8;cursor:pointer}
+.piece:after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;left:4.5px;top:-7px;background:inherit}
+.piece.red{background:#ff665d}.piece.blue{background:#47a5e2}
+.piece.selected{outline:4px solid white;outline-offset:2px}
+.legal{position:absolute;z-index:6;width:40px;height:40px;max-width:82%;aspect-ratio:1;border:4px solid white;border-radius:50%;cursor:pointer;animation:pulse .75s alternate infinite}
+@keyframes pulse{to{transform:scale(.86);opacity:.72}}
+.arrow{width:32px;height:32px;padding:0;border-radius:50%;font-size:19px;box-shadow:none}
+.position{position:absolute;right:4px;top:3px;font-size:9px;font-weight:800;color:#0009;z-index:3;background:#ffffff75;border-radius:10px;padding:1px 5px}
+.home{position:absolute;left:30.76923%;top:0;width:38.46154%;height:58px;display:grid;grid-template-columns:repeat(5,1fr);border-radius:4px;box-shadow:0 2px 4px #0005}
+.home.blue{background:#245f8d}.home.red{background:#a8332e}
+.home .cell{height:58px}
+.side-label{font-size:10px;text-align:center;color:#aaa;font-weight:700}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}.controls button{flex:1;min-width:110px}
+.note{margin-top:7px;text-align:center;font-size:11px;color:var(--muted)}
+details{margin-top:10px;background:#ffffffa8;border-radius:10px;padding:10px;font-size:13px;line-height:1.45}
+.win{font-weight:900;font-size:17px}
+@media(max-width:560px){
+  .app{padding:6px}
+  .home-row,.slider-row{grid-template-columns:30px minmax(0,1fr) 30px}
+  .lane,.slider,.cell{height:52px}
+  .home{height:50px}.home .cell{height:50px}
+  .hole{width:28px}
+  .piece{width:22px;height:29px;bottom:11px}.piece:after{width:15px;height:15px;left:3.5px}
+  .wall.v{width:8px}.wall.h{height:8px}
+  .arrow{width:26px;height:26px;font-size:16px}
+  .status{font-size:12px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div><h1>SHUTTLES <small style="font-size:.38em">V3</small></h1><div class="sub">Nine-hole sliders, fully visible at every position</div></div>
+    <button id="newBtn">New game</button>
+  </div>
+
+  <div class="status"><div id="turnText"></div><div id="hintText"></div></div>
+
+  <div class="shell">
+    <div class="board" id="board"></div>
+  </div>
+
+  <div class="note">The faint centre band is the five-hole fixed-board alignment. The complete 9-hole shuttle remains visible as it moves two notches left or right.</div>
+
+  <div class="controls">
+    <button id="undoBtn">↶ Undo</button>
+    <button id="centreBtn">Centre sliders</button>
+    <button id="rulesBtn">How to play</button>
+  </div>
+
+  <details id="rules">
+    <summary><b>How to play</b></summary>
+    <p>On your turn, either move one piece or slide one shuttle one notch. Red controls the red shuttles; Blue controls the blue shuttles. Either player may move the yellow shuttle unless the opponent moved it on the immediately preceding turn.</p>
+    <p>A piece moves any number of open holes in one orthogonal direction. It cannot cross a barrier, another piece, or a void where adjacent shuttles do not line up. An adjacent opposing piece may be jumped if the hole immediately beyond it is open; the jump ends the move.</p>
+    <p>Once a piece leaves its own starting block it cannot return. No piece may enter the opposing starting block until all five of that player's pieces have left home. First player to get all five pieces into the opposing starting block wins.</p>
+  </details>
+</div>
+
+<script>
+const root = document.querySelector('.app');
+const PHYS = 9;
+const STAGE = 13;
+const BASE = 2;              // centred 9-hole slider starts at stage columns 2..10
+const HOME_LEFT = 4;         // fixed five-hole homes occupy world columns 4..8
+
+// Exact barrier transcription from the supplied mock-up.
+// Vertical numbers are boundaries after physical hole N (holes are 1..9).
+// Horizontal ranges are [firstHole,lastHole], inclusive.
+const ROWS = [
+  {color:'red',  v:[4,5], bottom:[[3,3],[6,7]], top:[]},
+  {color:'blue', v:[4,7], bottom:[[1,1],[4,5],[9,9]], top:[]},
+  {color:'red',  v:[4],   bottom:[[2,3],[6,7]], top:[]},
+  {color:'blue', v:[5],   bottom:[[3,4],[7,8]], top:[]},
+  {color:'gold', v:[4,5], bottom:[], top:[]},
+  {color:'red',  v:[4],   bottom:[], top:[[2,3],[6,7]]},
+  {color:'blue', v:[5],   bottom:[], top:[[3,4],[7,8]]},
+  {color:'red',  v:[2,5], bottom:[], top:[[1,1],[5,6],[9,9]]},
+  {color:'blue', v:[4,5], bottom:[], top:[[3,4],[7,7]]}
+];
+
+let game, history = [];
+
+function newGame(){
+  game = {
+    turn:'blue',
+    offsets:Array(9).fill(0),
+    lastGoldBy:null,
+    selected:null,
+    winner:null,
+    pieces:[]
+  };
+  for(let c=0;c<5;c++){
+    game.pieces.push({id:'b'+c,color:'blue',zone:'homeB',c});
+    game.pieces.push({id:'r'+c,color:'red',zone:'homeR',c});
+  }
+  history = [];
+  render();
+}
+
+function snapshot(){ return JSON.parse(JSON.stringify(game)); }
+function save(){ history.push(snapshot()); if(history.length>80) history.shift(); }
+
+function sliderLeftPct(r){ return ((BASE + game.offsets[r]) / STAGE) * 100; }
+function worldCol(r,p){ return BASE + game.offsets[r] + p; }
+function physicalAtWorld(r,w){ return w - BASE - game.offsets[r]; }
+
+function pieceOnBoard(r,p,except=null){
+  return game.pieces.find(x=>x.zone==='board' && x.r===r && x.p===p && x.id!==except);
+}
+function pieceInHome(zone,c,except=null){
+  return game.pieces.find(x=>x.zone===zone && x.c===c && x.id!==except);
+}
+function ownHome(color){ return color==='blue' ? 'homeB' : 'homeR'; }
+function goalHome(color){ return color==='blue' ? 'homeR' : 'homeB'; }
+function allOut(color){
+  const z=ownHome(color);
+  return game.pieces.filter(x=>x.color===color).every(x=>x.zone!==z);
+}
+
+function hBlocks(r,p,edge){
+  const hole = p + 1;
+  return ROWS[r][edge].some(([a,b])=>hole>=a && hole<=b);
+}
+function vBlocks(r,boundaryAfterHole){
+  return ROWS[r].v.includes(boundaryAfterHole);
+}
+
+function nodeOccupant(n,except=null){
+  if(!n) return null;
+  return n.zone==='board'
+    ? pieceOnBoard(n.r,n.p,except)
+    : pieceInHome(n.zone,n.c,except);
+}
+
+function neighbor(n,dr,dc){
+  // Fixed top home.
+  if(n.zone==='homeB'){
+    if(dc){
+      const nc=n.c+dc;
+      return nc>=0&&nc<5 ? {zone:'homeB',c:nc} : null;
+    }
+    if(dr!==1) return null;
+    const w=HOME_LEFT+n.c;
+    const p=physicalAtWorld(0,w);
+    if(p<0||p>=PHYS||hBlocks(0,p,'top')) return null;
+    return {zone:'board',r:0,p};
+  }
+
+  // Fixed bottom home.
+  if(n.zone==='homeR'){
+    if(dc){
+      const nc=n.c+dc;
+      return nc>=0&&nc<5 ? {zone:'homeR',c:nc} : null;
+    }
+    if(dr!==-1) return null;
+    const w=HOME_LEFT+n.c;
+    const p=physicalAtWorld(8,w);
+    if(p<0||p>=PHYS||hBlocks(8,p,'bottom')) return null;
+    return {zone:'board',r:8,p};
+  }
+
+  // Horizontal travel stays on the same physical shuttle.
+  if(dc){
+    const np=n.p+dc;
+    if(np<0||np>=PHYS) return null;
+    // Moving right crosses the boundary after current hole; moving left crosses after destination hole.
+    const boundaryAfterHole = dc>0 ? n.p+1 : np+1;
+    if(vBlocks(n.r,boundaryAfterHole)) return null;
+    return {zone:'board',r:n.r,p:np};
+  }
+
+  const w=worldCol(n.r,n.p);
+
+  if(dr<0){
+    if(hBlocks(n.r,n.p,'top')) return null;
+    if(n.r===0){
+      const c=w-HOME_LEFT;
+      return c>=0&&c<5 ? {zone:'homeB',c} : null;
+    }
+    const np=physicalAtWorld(n.r-1,w);
+    if(np<0||np>=PHYS) return null; // void between misaligned sliders
+    if(hBlocks(n.r-1,np,'bottom')) return null;
+    return {zone:'board',r:n.r-1,p:np};
+  }
+
+  if(dr>0){
+    if(hBlocks(n.r,n.p,'bottom')) return null;
+    if(n.r===8){
+      const c=w-HOME_LEFT;
+      return c>=0&&c<5 ? {zone:'homeR',c} : null;
+    }
+    const np=physicalAtWorld(n.r+1,w);
+    if(np<0||np>=PHYS) return null; // void between misaligned sliders
+    if(hBlocks(n.r+1,np,'top')) return null;
+    return {zone:'board',r:n.r+1,p:np};
+  }
+
+  return null;
+}
+
+function sameNode(a,b){
+  if(!a||!b||a.zone!==b.zone) return false;
+  return a.zone==='board' ? a.r===b.r && a.p===b.p : a.c===b.c;
+}
+
+function canLand(piece,n){
+  if(!n) return false;
+  if(n.zone===ownHome(piece.color) && piece.zone!==ownHome(piece.color)) return false;
+  if(n.zone===goalHome(piece.color) && !allOut(piece.color)) return false;
+  return true;
+}
+
+function legalMoves(piece){
+  const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+  const start = piece.zone==='board'
+    ? {zone:'board',r:piece.r,p:piece.p}
+    : {zone:piece.zone,c:piece.c};
+  const out=[];
+
+  for(const [dr,dc] of dirs){
+    let cur=start;
+    while(true){
+      const n=neighbor(cur,dr,dc);
+      if(!n) break;
+
+      const occ=nodeOccupant(n,piece.id);
+      if(occ){
+        if(occ.color===piece.color) break;
+        const landing=neighbor(n,dr,dc);
+        if(landing && !nodeOccupant(landing,piece.id) && canLand(piece,landing)) out.push(landing);
+        break;
+      }
+
+      if(canLand(piece,n)) out.push(n);
+      cur=n;
+      if(n.zone!=='board') {
+        // Continue sideways within a home row, but never beyond a home row vertically.
+        if(dc===0) break;
+      }
+    }
+  }
+  return out;
+}
+
+function selectPiece(id){
+  if(game.winner) return;
+  const p=game.pieces.find(x=>x.id===id);
+  if(!p || p.color!==game.turn) return;
+  game.selected = game.selected===id ? null : id;
+  render();
+}
+
+function movePiece(id,target){
+  const p=game.pieces.find(x=>x.id===id);
+  if(!p || !legalMoves(p).some(n=>sameNode(n,target))) return;
+  save();
+  if(target.zone==='board'){
+    p.zone='board'; p.r=target.r; p.p=target.p;
+    delete p.c;
+  }else{
+    p.zone=target.zone; p.c=target.c;
+    delete p.r; delete p.p;
+  }
+  finishTurn('piece');
+}
+
+function canSlide(r,dir){
+  if(game.winner) return false;
+  const row=ROWS[r];
+  if(row.color!=='gold' && row.color!==game.turn) return false;
+  if(row.color==='gold' && game.lastGoldBy && game.lastGoldBy!==game.turn) return false;
+  const next=game.offsets[r]+dir;
+  return next>=-2 && next<=2;
+}
+
+function slide(r,dir){
+  if(!canSlide(r,dir)) return;
+  save();
+  game.offsets[r]+=dir;
+  // Pieces remain in the same physical hole and ride with the shuttle.
+  const isGold=ROWS[r].color==='gold';
+  if(isGold) game.lastGoldBy=game.turn;
+  finishTurn(isGold?'gold':'slider');
+}
+
+function finishTurn(kind){
+  game.selected=null;
+  if(kind!=='gold') game.lastGoldBy=null;
+  checkWinner();
+  if(!game.winner) game.turn=game.turn==='blue'?'red':'blue';
+  render();
+}
+
+function checkWinner(){
+  for(const color of ['blue','red']){
+    const goal=goalHome(color);
+    if(game.pieces.filter(x=>x.color===color).every(x=>x.zone===goal)){
+      game.winner=color;
+      return;
+    }
+  }
+}
+
+function makePieceEl(p){
+  const e=document.createElement('span');
+  e.className='piece '+p.color+(game.selected===p.id?' selected':'');
+  e.setAttribute('role','button');
+  e.setAttribute('tabindex','0');
+  e.setAttribute('aria-label',`${p.color} piece`);
+  e.addEventListener('click',ev=>{ev.stopPropagation();selectPiece(p.id)});
+  e.addEventListener('keydown',ev=>{
+    if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selectPiece(p.id)}
+  });
+  return e;
+}
+
+function makeHome(zone,color,label){
+  const row=document.createElement('div');
+  row.className='home-row';
+
+  const left=document.createElement('div');
+  left.className='side-label';
+  left.textContent=label;
+
+  const lane=document.createElement('div');
+  lane.className='lane';
+
+  const home=document.createElement('div');
+  home.className='home '+color;
+  for(let c=0;c<5;c++){
+    const cell=document.createElement('div');
+    cell.className='cell';
+    cell.innerHTML='<span class="hole"></span>';
+    const p=pieceInHome(zone,c);
+    if(p) cell.appendChild(makePieceEl(p));
+    home.appendChild(cell);
+  }
+  lane.appendChild(home);
+
+  const right=document.createElement('div');
+  row.append(left,lane,right);
+  return row;
+}
+
+function addWalls(slider,row){
+  for(const boundary of row.v){
+    const w=document.createElement('span');
+    w.className='wall v';
+    w.style.left=(boundary/9*100)+'%';
+    slider.appendChild(w);
+  }
+  for(const edge of ['top','bottom']){
+    for(const [a,b] of row[edge]){
+      const w=document.createElement('span');
+      w.className='wall h';
+      w.style.left=((a-1)/9*100)+'%';
+      w.style.width=((b-a+1)/9*100)+'%';
+      if(edge==='top') w.style.top='0';
+      else w.style.bottom='0';
+      slider.appendChild(w);
+    }
+  }
+}
+
+function render(){
+  const board=document.getElementById('board');
+  board.innerHTML='';
+  board.appendChild(makeHome('homeB','blue','BLUE'));
+
+  ROWS.forEach((rowDef,r)=>{
+    const row=document.createElement('div');
+    row.className='slider-row';
+
+    const left=document.createElement('button');
+    left.className='arrow'; left.textContent='‹';
+    left.setAttribute('aria-label',`Move ${rowDef.color} shuttle ${r+1} left`);
+    left.disabled=!canSlide(r,-1);
+    left.addEventListener('click',()=>slide(r,-1));
+
+    const lane=document.createElement('div');
+    lane.className='lane';
+
+    const slider=document.createElement('div');
+    slider.className='slider '+rowDef.color;
+    slider.style.left=sliderLeftPct(r)+'%';
+
+    const pos=document.createElement('span');
+    pos.className='position';
+    pos.textContent=(game.offsets[r]>0?'+':'')+game.offsets[r];
+    slider.appendChild(pos);
+
+    for(let p=0;p<9;p++){
+      const cell=document.createElement('div');
+      cell.className='cell';
+      cell.innerHTML='<span class="hole"></span>';
+      const piece=pieceOnBoard(r,p);
+      if(piece) cell.appendChild(makePieceEl(piece));
+      slider.appendChild(cell);
+    }
+    addWalls(slider,rowDef);
+    lane.appendChild(slider);
+
+    const right=document.createElement('button');
+    right.className='arrow'; right.textContent='›';
+    right.setAttribute('aria-label',`Move ${rowDef.color} shuttle ${r+1} right`);
+    right.disabled=!canSlide(r,1);
+    right.addEventListener('click',()=>slide(r,1));
+
+    row.append(left,lane,right);
+    board.appendChild(row);
+  });
+
+  board.appendChild(makeHome('homeR','red','RED'));
+
+  if(game.selected){
+    const p=game.pieces.find(x=>x.id===game.selected);
+    for(const n of legalMoves(p)){
+      let cell;
+      if(n.zone==='homeB'){
+        cell=board.children[0].querySelector('.home').children[n.c];
+      }else if(n.zone==='homeR'){
+        cell=board.children[10].querySelector('.home').children[n.c];
+      }else{
+        cell=board.children[n.r+1].querySelector('.slider').children[n.p+1]; // +1 because position badge is first child
+      }
+      const mark=document.createElement('span');
+      mark.className='legal';
+      mark.setAttribute('role','button');
+      mark.setAttribute('tabindex','0');
+      mark.setAttribute('aria-label','Legal destination');
+      mark.addEventListener('click',ev=>{ev.stopPropagation();movePiece(p.id,n)});
+      mark.addEventListener('keydown',ev=>{
+        if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();movePiece(p.id,n)}
+      });
+      cell.appendChild(mark);
+    }
+  }
+
+  const turn=document.getElementById('turnText');
+  if(game.winner){
+    turn.innerHTML=`<span class="win">${game.winner.toUpperCase()} WINS!</span>`;
+  }else{
+    const col=game.turn==='blue'?'#47a5e2':'#ff665d';
+    turn.innerHTML=`<span class="dot" style="background:${col}"></span><b>${game.turn[0].toUpperCase()+game.turn.slice(1)}'s turn</b>`;
+  }
+  document.getElementById('hintText').textContent=game.selected?'Choose a highlighted destination':'Move a piece or one shuttle';
+  document.getElementById('undoBtn').disabled=!history.length;
+}
+
+document.getElementById('newBtn').addEventListener('click',()=>{
+  if(confirm('Start a new game?')) newGame();
+});
+document.getElementById('undoBtn').addEventListener('click',()=>{
+  if(history.length){game=history.pop();game.selected=null;render();}
+});
+document.getElementById('centreBtn').addEventListener('click',()=>{
+  if(confirm('Centre all nine shuttles?')){
+    save(); game.offsets.fill(0); game.selected=null; render();
+  }
+});
+document.getElementById('rulesBtn').addEventListener('click',()=>{
+  const d=document.getElementById('rules');
+  d.open=!d.open;
+  if(d.open) d.scrollIntoView({behavior:'smooth',block:'nearest'});
+});
+
+newGame();
+</script>
+</body>
+</html>
